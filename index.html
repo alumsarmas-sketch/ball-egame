@@ -23,6 +23,9 @@
             --c-yellow: #fffb00;
             --c-red: #ff2a2a;
             --c-orange: #ff8c00;
+            --c-purple: #a855f7;
+            --c-yellow-tnt: #eab308;
+            --c-teal: #14b8a6;
             --font-main: 'Poppins', sans-serif;
         }
 
@@ -62,6 +65,9 @@
         .tool-btn.active[data-tool="platform"] { border-color: var(--c-orange); background: rgba(255,140,0,0.1); box-shadow: 0 0 20px rgba(255,140,0,0.2); }
         .tool-btn.active[data-tool="gas"] { border-color: var(--c-pink); background: rgba(255,0,234,0.1); box-shadow: 0 0 20px rgba(255,0,234,0.2); }
         .tool-btn.active[data-tool="gravity"] { border-color: var(--c-blue); background: rgba(0,243,255,0.1); box-shadow: 0 0 20px rgba(0,243,255,0.2); }
+        .tool-btn.active[data-tool="vortex"] { border-color: var(--c-purple); background: rgba(168,85,247,0.1); box-shadow: 0 0 20px rgba(168,85,247,0.2); }
+        .tool-btn.active[data-tool="tnt"] { border-color: var(--c-yellow-tnt); background: rgba(234,179,8,0.1); box-shadow: 0 0 20px rgba(234,179,8,0.2); }
+        .tool-btn.active[data-tool="director"] { border-color: var(--c-teal); background: rgba(20,184,166,0.1); box-shadow: 0 0 20px rgba(20,184,166,0.2); }
 
         /* Canvas Wrapper */
         #game-canvas {
@@ -179,6 +185,37 @@
                         <div class="text-xs text-gray-400 leading-tight mt-1">Alinea gravedad a la canasta.</div>
                     </div>
                 </button>
+
+                <!-- Nuevas Herramientas -->
+                <button class="tool-btn flex items-center gap-4 p-3 rounded-xl bg-black/50" data-tool="vortex">
+                    <div class="w-14 h-14 rounded-lg bg-purple-500/10 border border-purple-500 flex items-center justify-center text-purple-400 text-2xl shadow-[0_0_15px_rgba(168,85,247,0.2)] shrink-0">
+                        <i class="fa-solid fa-tornado"></i>
+                    </div>
+                    <div class="text-left">
+                        <div class="font-bold text-white tracking-wide">Air Vortex</div>
+                        <div class="text-xs text-gray-400 leading-tight mt-1">Lanza una onda en parábola suave (1 uso).</div>
+                    </div>
+                </button>
+
+                <button class="tool-btn flex items-center gap-4 p-3 rounded-xl bg-black/50" data-tool="tnt">
+                    <div class="w-14 h-14 rounded-lg bg-yellow-500/10 border border-yellow-500 flex items-center justify-center text-yellow-400 text-2xl shadow-[0_0_15px_rgba(234,179,8,0.2)] shrink-0">
+                        <i class="fa-solid fa-bomb"></i>
+                    </div>
+                    <div class="text-left">
+                        <div class="font-bold text-white tracking-wide">Sticky TNT</div>
+                        <div class="text-xs text-gray-400 leading-tight mt-1">Se pega a bloques. Explota impulsando arriba.</div>
+                    </div>
+                </button>
+
+                <button class="tool-btn flex items-center gap-4 p-3 rounded-xl bg-black/50" data-tool="director">
+                    <div class="w-14 h-14 rounded-lg bg-teal-500/10 border border-teal-500 flex items-center justify-center text-teal-400 text-2xl shadow-[0_0_15px_rgba(20,184,166,0.2)] shrink-0">
+                        <i class="fa-solid fa-crosshairs"></i>
+                    </div>
+                    <div class="text-left">
+                        <div class="font-bold text-white tracking-wide">Director</div>
+                        <div class="text-xs text-gray-400 leading-tight mt-1">Atrapa la pelota y permite apuntar el disparo.</div>
+                    </div>
+                </button>
             </div>
         </div>
 
@@ -249,10 +286,10 @@
         let isBasketUp = true;
         let placedTools = [];
         let particles = [];
-        
-        // Timers
-        let timeLeft = 60.0;
-        let winTimer = 0;
+
+        // Estado Director
+        let directorTrappedBall = null; // Referencia al director que retiene la pelota
+        let directorAimAngle = 0;
         let lastTimestamp = 0;
         
         // Camera & Mouse (The Custom Rendering Solution)
@@ -300,6 +337,13 @@
             if (gameState === 'SIM') {
                 Engine.update(engine, dt * 1000); // Standard 60fps update
                 checkWinCondition(dt);
+
+                // Si la pelota está atrapada en un director, congelar su movimiento en el centro del bloque
+                if (directorTrappedBall) {
+                    Body.setPosition(ball, { x: directorTrappedBall.position.x, y: directorTrappedBall.position.y });
+                    Body.setVelocity(ball, { x: 0, y: 0 });
+                    directorAimAngle = Math.atan2(mouse.worldY - directorTrappedBall.position.y, mouse.worldX - directorTrappedBall.position.x);
+                }
             }
 
             updateParticles(dt);
@@ -331,6 +375,25 @@
 
             // Draw Tools
             placedTools.forEach(t => drawBody(t));
+
+            // Draw Director Aiming Arrow if active
+            if (directorTrappedBall && gameState === 'SIM') {
+                ctx.save();
+                ctx.translate(directorTrappedBall.position.x, directorTrappedBall.position.y);
+                ctx.rotate(directorAimAngle);
+                ctx.strokeStyle = '#14b8a6';
+                ctx.lineWidth = 6;
+                ctx.shadowColor = '#14b8a6';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(120, 0);
+                ctx.lineTo(100, -15);
+                ctx.moveTo(120, 0);
+                ctx.lineTo(100, 15);
+                ctx.stroke();
+                ctx.restore();
+            }
 
             // Draw Basket Target
             if (basketSensor && gameState !== 'START') drawBasket();
@@ -450,6 +513,24 @@
                 // inner arrow
                 ctx.fillStyle = '#00f3ff';
                 ctx.beginPath(); ctx.moveTo(-20, -10); ctx.lineTo(20, -10); ctx.lineTo(0, 25); ctx.fill();
+            } else if (type === 'vortex') {
+                ctx.fillStyle = charges > 0 ? '#a855f7' : '#333';
+                ctx.shadowColor = charges > 0 ? '#a855f7' : 'transparent';
+                ctx.beginPath(); ctx.arc(0, 0, 50, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.font = "900 24px Poppins"; ctx.textAlign = "center"; ctx.textBaseline="middle"; ctx.shadowBlur=0;
+                ctx.fillText(charges || "0", 0, 0);
+            } else if (type === 'tnt') {
+                ctx.fillStyle = '#eab308'; ctx.shadowColor = '#eab308';
+                ctx.fillRect(-35, -35, 70, 70);
+                ctx.fillStyle = '#000'; ctx.font = "900 22px Poppins"; ctx.textAlign = "center"; ctx.textBaseline="middle"; ctx.shadowBlur=0;
+                ctx.fillText("TNT", 0, 0);
+            } else if (type === 'director') {
+                ctx.fillStyle = 'rgba(20, 184, 166, 0.4)'; ctx.strokeStyle = '#14b8a6'; ctx.lineWidth = 4;
+                ctx.shadowColor = '#14b8a6';
+                ctx.fillRect(-50, -50, 100, 100);
+                ctx.strokeRect(-50, -50, 100, 100);
+                ctx.fillStyle = '#14b8a6'; ctx.font = "900 30px Poppins"; ctx.textAlign = "center"; ctx.textBaseline="middle"; ctx.shadowBlur=0;
+                ctx.fillText("🎯", 0, 0);
             }
         }
 
@@ -463,6 +544,7 @@
             Engine.clear(engine);
             placedTools = [];
             particles = [];
+            directorTrappedBall = null;
             engine.gravity.y = 1;
             
             createBounds();
@@ -523,6 +605,26 @@
             if (gameState !== 'BUILD') return;
             gameState = 'SIM';
             timeLeft = 60.0;
+
+            // Verificar adhesión de Sticky TNT
+            placedTools.forEach(t => {
+                if (t.label === 'tnt') {
+                    // Buscar si está colisionando con alguna plataforma u otro objeto estático
+                    let isAttached = false;
+                    placedTools.forEach(other => {
+                        if (other !== t && (other.label === 'platform' || other.label === 'trampoline')) {
+                            if (Matter.Bounds.overlaps(t.bounds, other.bounds)) {
+                                isAttached = true;
+                            }
+                        }
+                    });
+                    if (!isAttached) {
+                        // Si no está pegado a nada, se vuelve dinámico y cae por gravedad
+                        Body.setStatic(t, false);
+                    }
+                }
+            });
+
             Body.setStatic(ball, false);
             updateHUDMode('SIM');
         }
@@ -576,7 +678,15 @@
                 if (e.button === 0) placeTool();
                 else if (e.button === 2) deleteTool();
             } else if (gameState === 'SIM') {
-                if (e.button === 0) fireGas();
+                if (e.button === 0) {
+                    if (directorTrappedBall) {
+                        fireDirector();
+                    } else {
+                        fireGas();
+                        fireVortex();
+                        triggerTNT();
+                    }
+                }
             }
         });
         
@@ -606,6 +716,16 @@
             } else if(currentTool === 'gravity') {
                 opts.label = 'gravity'; opts.isSensor = true;
                 body = Bodies.circle(mouse.worldX, mouse.worldY, 60, opts);
+            } else if(currentTool === 'vortex') {
+                opts.label = 'vortex';
+                body = Bodies.circle(mouse.worldX, mouse.worldY, 50, opts);
+                body.c_charges = 1;
+            } else if(currentTool === 'tnt') {
+                opts.label = 'tnt';
+                body = Bodies.rectangle(mouse.worldX, mouse.worldY, 70, 70, opts);
+            } else if(currentTool === 'director') {
+                opts.label = 'director'; opts.isSensor = true;
+                body = Bodies.rectangle(mouse.worldX, mouse.worldY, 100, 100, opts);
             }
 
             if(body) {
@@ -661,6 +781,61 @@
             }
         }
 
+        function fireVortex() {
+            const hit = placedTools.find(b => b.label === 'vortex' && b.c_charges > 0 && Matter.Bounds.contains(b.bounds, mouse) && Matter.Vertices.contains(b.vertices, mouse));
+            if(hit) {
+                hit.c_charges--;
+                const angle = hit.angle;
+                const spd = 18;
+                // Impulso lento en parábola (hacia adelante y hacia arriba)
+                const vx = Math.cos(angle) * spd;
+                const vy = Math.sin(angle) * spd - 10;
+                Body.setVelocity(ball, { x: vx, y: vy });
+                spawnBurst(hit.position.x, hit.position.y, '#a855f7', 35);
+            }
+        }
+
+        function triggerTNT() {
+            const hit = placedTools.find(b => b.label === 'tnt' && Matter.Bounds.contains(b.bounds, mouse) && Matter.Vertices.contains(b.vertices, mouse));
+            if(hit) {
+                // Explosión visual
+                spawnBurst(hit.position.x, hit.position.y, '#eab308', 50);
+                spawnBurst(hit.position.x, hit.position.y, '#ff2a2a', 30);
+
+                // Impulsar la pelota hacia arriba si está en el radio
+                const dx = ball.position.x - hit.position.x;
+                const dy = ball.position.y - hit.position.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 400) {
+                    Body.setVelocity(ball, { x: dx * 0.05, y: -35 });
+                }
+
+                // Destruir piezas alrededor
+                const destroyRadius = 250;
+                const toDestroy = placedTools.filter(t => {
+                    if (t === hit) return true;
+                    const d = Vector.magnitude(Vector.sub(t.position, hit.position));
+                    return d < destroyRadius;
+                });
+
+                toDestroy.forEach(t => {
+                    spawnBurst(t.position.x, t.position.y, '#ff8c00', 15);
+                    Composite.remove(engine.world, t);
+                    placedTools = placedTools.filter(item => item !== t);
+                });
+            }
+        }
+
+        function fireDirector() {
+            if (!directorTrappedBall) return;
+            const spd = 30;
+            const vx = Math.cos(directorAimAngle) * spd;
+            const vy = Math.sin(directorAimAngle) * spd;
+            Body.setVelocity(ball, { x: vx, y: vy });
+            spawnBurst(directorTrappedBall.position.x, directorTrappedBall.position.y, '#14b8a6', 30);
+            directorTrappedBall = null;
+        }
+
         // --- Physics Events ---
         Events.on(engine, 'collisionStart', e => {
             if(gameState !== 'SIM') return;
@@ -668,6 +843,15 @@
             e.pairs.forEach(pair => {
                 const { bodyA, bodyB } = pair;
                 
+                // Director Trap logic
+                if (bodyA.label === 'director' || bodyB.label === 'director') {
+                    const dir = bodyA.label === 'director' ? bodyA : bodyB;
+                    const other = bodyA.label === 'director' ? bodyB : bodyA;
+                    if (other.label === 'ball' && !directorTrappedBall) {
+                        directorTrappedBall = dir;
+                    }
+                }
+
                 // Death Walls
                 if(bodyA.label === 'wall' || bodyB.label === 'wall') {
                     const other = bodyA.label === 'wall' ? bodyB : bodyA;
